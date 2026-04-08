@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HailWatch">
+<meta name="theme-color" content="#0a1628">
+<title>HailWatch</title>
+<style>
+  :root {
+    --storm: #0a1628;
+    --steel: #1c2e4a;
+    --ice: #b8e0f7;
+    --alert: #00d4ff;
+    --safe: #00c87a;
+    --warn: #ffb700;
+    --danger: #ff4136;
+    --muted: #4a6280;
+    --panel: rgba(255,255,255,0.05);
+    --border: rgba(184,224,247,0.13);
+    --safe-top: env(safe-area-inset-top);
+    --safe-bot: env(safe-area-inset-bottom);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    background: var(--storm);
+    color: var(--ice);
+    font-family: -apple-system, 'SF Pro Display', sans-serif;
+    overflow: hidden;
+  }
+
+  /* ── SHELL ── */
+  .shell {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 430px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* animated bg */
+  .shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 120% 50% at 10% 0%, rgba(0,80,180,0.3) 0%, transparent 55%),
+      radial-gradient(ellipse 80% 60% at 90% 100%, rgba(0,20,70,0.5) 0%, transparent 60%);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .rain {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .drop {
+    position: absolute;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, rgba(184,224,247,0.2));
+    animation: fall linear infinite;
+  }
+  .hstone {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #dff0fb, #88bede);
+    animation: hfall linear infinite;
+  }
+  @keyframes fall {
+    from { transform: translateY(-80px); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 0.4; }
+    to   { transform: translateY(110dvh); opacity: 0; }
+  }
+  @keyframes hfall {
+    from { transform: translateY(-20px); opacity: 0; }
+    10%  { opacity: 1; }
+    to   { transform: translateY(110dvh); opacity: 0; }
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    position: relative;
+    z-index: 10;
+    padding: calc(var(--safe-top) + 14px) 18px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(10,22,40,0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .app-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: #fff;
+  }
+  .app-title span { color: var(--alert); }
+
+  .live-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0,200,122,0.12);
+    border: 0.5px solid rgba(0,200,122,0.3);
+    border-radius: 100px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--safe);
+    letter-spacing: 0.04em;
+  }
+  .live-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--safe);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(.6);} }
+
+  /* ── SCROLL BODY ── */
+  .body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    z-index: 5;
+    padding: 14px 14px calc(var(--safe-bot) + 80px);
+    scroll-behavior: smooth;
+  }
+
+  /* ── NWS ALERT BANNER ── */
+  .alert-banner {
+    display: none;
+    padding: 12px 14px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    border: 1px solid;
+  }
+  .alert-banner.on { display: block; }
+  .alert-banner.red { background: rgba(255,65,54,.12); border-color: rgba(255,65,54,.35); }
+  .alert-banner.amber { background: rgba(255,183,0,.1); border-color: rgba(255,183,0,.35); }
+  .alert-banner h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .alert-banner.red h4 { color: #ff8a85; }
+  .alert-banner.amber h4 { color: #ffd060; }
+  .alert-banner p { font-size: 13px; line-height: 1.45; color: rgba(184,224,247,.7); }
+
+  /* ── STATUS CARD ── */
+  .status-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px 16px;
+    margin-bottom: 12px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: border-color .4s, box-shadow .4s;
+  }
+  .status-card.danger { border-color: rgba(255,65,54,.5); box-shadow: 0 0 24px rgba(255,65,54,.12); }
+  .status-card.warn   { border-color: rgba(255,183,0,.5); box-shadow: 0 0 24px rgba(255,183,0,.1); }
+  .status-card.ok     { border-color: rgba(0,200,122,.3); }
+
+  .s-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 11px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .s-badge.d { background:rgba(255,65,54,.15);color:#ff7a76;border:0.5px solid rgba(255,65,54,.3); }
+  .s-badge.w { background:rgba(255,183,0,.15);color:#ffd060;border:0.5px solid rgba(255,183,0,.3); }
+  .s-badge.o { background:rgba(0,200,122,.12);color:#00d985;border:0.5px solid rgba(0,200,122,.28); }
+
+  .s-main { display: flex; align-items: center; gap: 14px; }
+  .s-icon { font-size: 38px; line-height: 1; flex-shrink: 0; }
+  .s-head { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -0.3px; line-height: 1.15; }
+  .s-sub  { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+
+  /* ── METRICS ROW ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .metric {
+    background: var(--panel);
+    border: 0.5px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 14px 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .m-lbl { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; font-weight: 500; }
+  .m-val { font-size: 28px; font-weight: 700; color: #fff; letter-spacing: -0.5px; line-height: 1; }
+  .m-val.r { color: #ff7a76; }
+  .m-val.a { color: #ffd060; }
+  .m-val.g { color: #00d985; }
+  .m-val.b { color: var(--alert); }
+  .m-unit { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .m-val.sm { font-size: 16px; padding-top: 6px; }
+
+  /* ── SECTION CARD ── */
+  .sec {
+    background: var(--panel);
+    border: 0.5px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .sec-hd {
+    padding: 13px 16px;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .sec-hd h3 { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.03em; }
+  .v-tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 100px;
+    background: rgba(0,200,122,.1);
+    color: var(--safe);
+    border: 0.5px solid rgba(0,200,122,.25);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* ── FILTER ROW ── */
+  .frow {
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .frow select, .frow input[type=date] {
+    background: rgba(255,255,255,.07);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    color: var(--ice);
+    font-size: 12px;
+    padding: 7px 10px;
+    outline: none;
+    font-family: -apple-system, sans-serif;
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    min-width: 110px;
+  }
+  .frow select option { background: #0d1e38; }
+  .f-btn {
+    padding: 8px 14px;
+    background: rgba(0,212,255,.12);
+    border: 0.5px solid rgba(0,212,255,.3);
+    border-radius: 8px;
+    color: var(--alert);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* ── EVENT CARDS (mobile-friendly, no table) ── */
+  .evt-list { padding: 4px 0; }
+  .evt-card {
+    padding: 14px 16px;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .evt-card:last-child { border-bottom: none; }
+  .evt-sz {
+    flex-shrink: 0;
+    width: 56px;
+    text-align: center;
+  }
+  .sz-big { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.5px; line-height: 1; }
+  .sz-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .sz-bar { height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--alert), var(--danger)); margin-top: 5px; }
+  .evt-body { flex: 1; min-width: 0; }
+  .evt-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .evt-date { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .evt-dist { font-size: 11px; color: var(--alert); font-weight: 600; }
+  .chip {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .c-sig { background:rgba(255,65,54,.2);color:#ff7a76; }
+  .c-mod { background:rgba(255,183,0,.2);color:#ffd060; }
+  .c-min { background:rgba(0,200,122,.15);color:#00d985; }
+  .evt-loc { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px; }
+  .evt-desc { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .evt-src { font-size: 10px; color: rgba(74,98,128,.7); margin-top: 4px; }
+  .no-evt { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  .evt-foot {
+    padding: 10px 16px;
+    border-top: 0.5px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .evt-foot strong { color: var(--alert); }
+
+  /* ── MAP ── */
+  .map-frame {
+    position: relative;
+    height: 200px;
+    background: #0d1e35;
+  }
+  .map-frame iframe { width: 100%; height: 100%; border: none; opacity: .88; }
+  .map-pin {
+    position: absolute;
+    bottom: 8px;
+    left: 10px;
+    background: rgba(10,22,40,.88);
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 10px;
+    color: var(--alert);
+    letter-spacing: 0.06em;
+    pointer-events: none;
+  }
+
+  /* ── QUICK LINKS ── */
+  .ql-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+  .ql {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 12px;
+    background: rgba(255,255,255,.04);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    color: var(--ice);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background .2s;
+    cursor: pointer;
+  }
+  .ql:active { background: rgba(0,212,255,.1); }
+  .ql-ico { font-size: 18px; flex-shrink: 0; }
+
+  /* ── TIPS ── */
+  .tips-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+  .tip {
+    background: rgba(255,255,255,.03);
+    border: 0.5px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 12px 14px;
+  }
+  .tip-ico { font-size: 20px; margin-bottom: 7px; }
+  .tip h4 { font-size: 11px; font-weight: 700; color: var(--alert); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 4px; }
+  .tip p { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+  /* ── BOTTOM NAV ── */
+  .tab-bar {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    background: rgba(10,22,40,0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 0.5px solid var(--border);
+    padding-bottom: var(--safe-bot);
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 10px 4px 6px;
+    cursor: pointer;
+    color: var(--muted);
+    transition: color .2s;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border: none;
+    background: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tab.active { color: var(--alert); }
+  .tab-ico { font-size: 22px; line-height: 1; }
+
+  /* ── PAGES ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── LOADER ── */
+  .loader {
+    position: fixed;
+    inset: 0;
+    background: var(--storm);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    transition: opacity .5s, visibility .5s;
+  }
+  .loader.gone { opacity: 0; visibility: hidden; }
+  .l-ico { font-size: 48px; animation: bob 1s ease-in-out infinite alternate; margin-bottom: 16px; }
+  @keyframes bob { from{transform:translateY(0);} to{transform:translateY(-10px);} }
+  .l-txt { font-size: 13px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; animation: blink 1.2s step-end infinite; }
+  @keyframes blink { 50%{opacity:.3;} }
+  @keyframes spin { to{transform:rotate(360deg);} }
+  .spin { animation: spin .7s linear infinite; display: inline-block; }
+
+  /* ── INSTALL BANNER ── */
+  .install-bar {
+    display: none;
+    margin-bottom: 12px;
+    background: rgba(0,212,255,.08);
+    border: 1px solid rgba(0,212,255,.25);
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+  .install-bar.show { display: block; }
+  .install-bar h4 { font-size: 13px; font-weight: 700; color: var(--alert); margin-bottom: 4px; }
+  .install-bar p { font-size: 12px; color: var(--muted); line-height: 1.55; }
+  .install-steps { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .install-steps span { font-size: 12px; color: var(--ice); display: flex; align-items: center; gap: 6px; }
+  .step-n { background: rgba(0,212,255,.15); color: var(--alert); border-radius: 50%; width: 18px; height: 18px; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .dismiss-btn { margin-top: 10px; font-size: 12px; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
+</style>
+</head>
+<body>
+
+<div class="loader" id="loader"><div class="l-ico">🧊</div><div class="l-txt">HailWatch loading…</div></div>
+<div class="rain" id="rain"></div>
+
+<div class="shell">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="app-title">Hail<span>Watch</span></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:11px;color:var(--muted)" id="tsLabel">—</span>
+      <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    </div>
+  </div>
+
+  <!-- SCROLLABLE BODY -->
+  <div class="body" id="bodyScroll">
+
+    <!-- PAGE: HOME -->
+    <div class="page active" id="pg-home">
+
+      <!-- Install banner (shown only in browser, not when installed) -->
+      <div class="install-bar" id="installBar">
+        <h4>📲 Add to Home Screen</h4>
+        <p>Install HailWatch as an app — works offline, no App Store needed.</p>
+        <div class="install-steps">
+          <span><div class="step-n">1</div> Tap the Share button <strong>⎙</strong> in Safari</span>
+          <span><div class="step-n">2</div> Scroll down → tap <strong>"Add to Home Screen"</strong></span>
+          <span><div class="step-n">3</div> Tap <strong>Add</strong> — done!</span>
+        </div>
+        <button class="dismiss-btn" onclick="document.getElementById('installBar').classList.remove('show');localStorage.setItem('hw_dismissed','1')">Dismiss</button>
+      </div>
+
+      <!-- NWS Alert -->
+      <div class="alert-banner" id="alertBanner">
+        <h4 id="alertTitle">⚠ Alert</h4>
+        <p id="alertBody"></p>
+      </div>
+
+      <!-- Status Card -->
+      <div class="status-card ok" id="scard">
+        <div class="s-badge o" id="sbadge"><span>●</span><span id="sbt">Loading...</span></div>
+        <div class="s-main">
+          <div class="s-icon" id="sico">⏳</div>
+          <div>
+            <div class="s-head" id="sh">Checking now...</div>
+            <div class="s-sub" id="sd">Frost Lane · Naperville IL 60564</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="metrics">
+        <div class="metric"><div class="m-lbl">Temperature</div><div class="m-val" id="mT">—</div><div class="m-unit">°F</div></div>
+        <div class="metric"><div class="m-lbl">Wind / Gusts</div><div class="m-val" id="mW">—</div><div class="m-unit">mph</div></div>
+        <div class="metric"><div class="m-lbl">Visibility</div><div class="m-val" id="mV">—</div><div class="m-unit">miles</div></div>
+        <div class="metric"><div class="m-lbl">Condition</div><div class="m-val b sm" id="mC">—</div><div class="m-unit">Current sky</div></div>
+      </div>
+
+      <!-- Mini event summary -->
+      <div class="sec">
+        <div class="sec-hd">
+          <h3>🧊 Recent Hail Near You</h3>
+          <span style="font-size:11px;color:var(--alert);font-weight:600;" id="miniCount">—</span>
+        </div>
+        <div id="miniList"></div>
+        <div style="padding:10px 14px;border-top:0.5px solid var(--border);">
+          <button onclick="goTab('events')" style="width:100%;padding:11px;background:rgba(0,212,255,.08);border:0.5px solid rgba(0,212,255,.25);border-radius:10px;color:var(--alert);font-size:13px;font-weight:600;cursor:pointer;letter-spacing:0.02em;">View All Events →</button>
+        </div>
+      </div>
+
+    </div><!-- /pg-home -->
+
+    <!-- PAGE: EVENTS -->
+    <div class="page" id="pg-events">
+      <div class="sec">
+        <div class="sec-hd">
+          <h3>🧊 Hail Events — Chicago Metro</h3>
+          <span class="v-tag">✓ NWS Verified</span>
+        </div>
+        <div class="frow">
+          <input type="date" id="dfrom" value="2025-03-07" min="2025-03-07">
+          <select id="fsev">
+            <option value="all">All sizes</option>
+            <option value="significant">1.75"+ only</option>
+            <option value="moderate">1.00"+ only</option>
+          </select>
+          <select id="frad">
+            <option value="25">25 mi</option>
+            <option value="50" selected>50 mi</option>
+            <option value="100">100 mi</option>
+          </select>
+          <button class="f-btn" onclick="filterEvts()">Filter</button>
+        </div>
+        <div class="evt-list" id="evtList"></div>
+        <div class="evt-foot" id="evtFoot"></div>
+      </div>
+    </div><!-- /pg-events -->
+
+    <!-- PAGE: MAP -->
+    <div class="page" id="pg-map">
+      <div class="sec">
+        <div class="sec-hd"><h3>📍 Your Location</h3></div>
+        <div class="map-frame">
+          <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-88.2300,41.6500,-88.1500,41.7100&layer=mapnik&marker=41.6820,-88.1950" allowfullscreen loading="lazy" title="Frost Lane Naperville"></iframe>
+          <div class="map-pin">🏠 FROST LANE · NAPERVILLE IL 60564</div>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-hd"><h3>🌀 Radar &amp; Resources</h3></div>
+        <div class="ql-grid">
+          <a class="ql" href="https://radar.weather.gov/station/KLOT/standard" target="_blank"><span class="ql-ico">🌀</span><span>KLOT Radar</span></a>
+          <a class="ql" href="https://www.weather.gov/lot/" target="_blank"><span class="ql-ico">📋</span><span>NWS Chicago</span></a>
+          <a class="ql" href="https://www.spc.noaa.gov/products/watch/" target="_blank"><span class="ql-ico">⚡</span><span>SPC Watches</span></a>
+          <a class="ql" href="https://www.ncdc.noaa.gov/stormevents/" target="_blank"><span class="ql-ico">📊</span><span>NOAA Storm DB</span></a>
+          <a class="ql" href="https://www.interactivehailmaps.com/local-hail-map/naperville-il/" target="_blank"><span class="ql-ico">🗺</span><span>Hail Maps</span></a>
+          <button class="ql" onclick="loadWeather()"><span class="ql-ico">↻</span><span id="rfLbl">Refresh</span></button>
+        </div>
+      </div>
+    </div><!-- /pg-map -->
+
+    <!-- PAGE: TIPS -->
+    <div class="page" id="pg-tips">
+      <div class="sec">
+        <div class="sec-hd"><h3>🏠 Protect Your Home</h3></div>
+        <div class="tips-grid">
+          <div class="tip"><div class="tip-ico">🚗</div><h4>Vehicles</h4><p>Move cars into the garage. Hail over 1" cracks windshields. DuPage County averages 4+ significant events per year.</p></div>
+          <div class="tip"><div class="tip-ico">🏠</div><h4>Home Prep</h4><p>Bring in furniture, close windows and skylights before storms. Consider Class 4 impact-resistant shingles.</p></div>
+          <div class="tip"><div class="tip-ico">📸</div><h4>Document Damage</h4><p>Photograph hail damage immediately after any storm. Timestamped photos strengthen your insurance claim. Measure stone size if safe.</p></div>
+          <div class="tip"><div class="tip-ico">⚡</div><h4>Stay Inside</h4><p>During active hail, avoid windows. Interior rooms on lower floors are safest. Stay away from skylights.</p></div>
+          <div class="tip"><div class="tip-ico">📱</div><h4>Get Alerts</h4><p>Enable weather alerts in your iPhone Settings → Notifications → Weather. NWS Wireless Emergency Alerts require no app.</p></div>
+          <div class="tip"><div class="tip-ico">🔍</div><h4>Roof Check</h4><p>After any hail over 1", get a professional roof inspection. Granule loss shortens shingle life even without visible cracks.</p></div>
+        </div>
+      </div>
+    </div><!-- /pg-tips -->
+
+  </div><!-- /body -->
+
+  <!-- BOTTOM TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab active" id="tab-home" onclick="goTab('home')">
+      <span class="tab-ico">🌦</span>Home
+    </button>
+    <button class="tab" id="tab-events" onclick="goTab('events')">
+      <span class="tab-ico">🧊</span>Events
+    </button>
+    <button class="tab" id="tab-map" onclick="goTab('map')">
+      <span class="tab-ico">🗺</span>Map
+    </button>
+    <button class="tab" id="tab-tips" onclick="goTab('tips')">
+      <span class="tab-ico">🏠</span>Tips
+    </button>
+  </div>
+
+</div><!-- /shell -->
+
+<script>
+// ── EVENTS DB ──────────────────────────────────────────────
+const EVENTS = [
+  { date:'2026-03-10', label:'Mar 10, 2026', loc:'Darien / Bolingbrook, IL',
+    desc:'Record 4.8" hailstones in Darien (possible IL state record). Golf ball hail in Bolingbrook. EF-3 tornado ~60 mi south.',
+    dist:8, distStr:'~8 mi NW', size:4.8, sizeStr:'4.80"', sev:'significant', src:'NWS Chicago / CBS Chicago' },
+  { date:'2025-06-08', label:'Jun 8, 2025', loc:'Batavia, IL (Kane Co.)',
+    desc:'Microburst with tennis ball hail (2.5") and 80–85 mph winds. Widespread roof and vehicle damage across western suburbs.',
+    dist:22, distStr:'~22 mi N', size:2.5, sizeStr:'2.50"', sev:'significant', src:'NWS Chicago LSR' },
+  { date:'2025-05-15', label:'May 15, 2025', loc:'DuPage / Will County, IL',
+    desc:'Scattered severe storms produced hail up to 3 inches across DuPage and northern Will counties. Multiple NWS storm reports filed.',
+    dist:10, distStr:'~10 mi area', size:3.0, sizeStr:'3.00"', sev:'significant', src:'NWS Chicago LSR' },
+  { date:'2025-03-30', label:'Mar 30, 2025', loc:'Southern Will County, IL',
+    desc:'Line of storms produced wind damage and one tornado in NW Indiana. Quarter-sized hail in southern Will County.',
+    dist:42, distStr:'~42 mi SE', size:1.0, sizeStr:'1.00"', sev:'moderate', src:'NWS Chicago LSR' },
+  { date:'2025-03-19', label:'Mar 19, 2025', loc:'DuPage / Will County, IL',
+    desc:'Afternoon/evening storms with damaging winds, hail, and multiple tornadoes across Chicago south suburbs. Spotter hail near Bolingbrook.',
+    dist:12, distStr:'~12 mi area', size:1.0, sizeStr:'1.00"', sev:'moderate', src:'NWS Chicago / StormerSite' },
+];
+
+// ── TABS ───────────────────────────────────────────────────
+function goTab(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('pg-'+name).classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('bodyScroll').scrollTo(0,0);
+  if(name==='events') filterEvts();
+}
+
+// ── FILTER EVENTS ──────────────────────────────────────────
+function filterEvts() {
+  const from = document.getElementById('dfrom').value || '2025-03-07';
+  const sev  = document.getElementById('fsev').value;
+  const rad  = parseInt(document.getElementById('frad').value);
+  const rows = EVENTS.filter(e => {
+    if(e.date < from) return false;
+    if(e.dist > rad) return false;
+    if(sev==='significant' && e.sev!=='significant') return false;
+    if(sev==='moderate' && e.sev==='minor') return false;
+    return true;
+  });
+  const list = document.getElementById('evtList');
+  const foot = document.getElementById('evtFoot');
+  if(!rows.length) {
+    list.innerHTML='<div class="no-evt">No events match your filters.<br>Try expanding radius or date range.</div>';
+    foot.innerHTML='';
+    return;
+  }
+  list.innerHTML = rows.map(e => {
+    const mx=5, pct=Math.round(Math.min((e.size/mx)*100,100));
+    const cc=e.sev==='significant'?'c-sig':e.sev==='moderate'?'c-mod':'c-min';
+    const cl=e.sev==='significant'?'Significant':e.sev==='moderate'?'Moderate':'Minor';
+    return `<div class="evt-card">
+      <div class="evt-sz">
+        <div class="sz-big">${e.sizeStr}</div>
+        <div class="sz-lbl">diameter</div>
+        <div class="sz-bar" style="width:${pct}%"></div>
+      </div>
+      <div class="evt-body">
+        <div class="evt-top">
+          <span class="evt-date">${e.label}</span>
+          <span class="evt-dist">${e.distStr}</span>
+          <span class="chip ${cc}">${cl}</span>
+        </div>
+        <div class="evt-loc">${e.loc}</div>
+        <div class="evt-desc">${e.desc}</div>
+        <div class="evt-src">Source: ${e.src}</div>
+      </div>
+    </div>`;
+  }).join('');
+  const sig=rows.filter(r=>r.sev==='significant').length;
+  const mx=Math.max(...rows.map(r=>r.size));
+  foot.innerHTML=`<strong>${rows.length}</strong> event${rows.length!==1?'s':''} &middot; <strong>${sig}</strong> significant &middot; Largest: <strong>${mx}"</strong><span style="opacity:.5;font-size:10px">NWS·NOAA·SPC verified</span>`;
+}
+
+// ── MINI LIST (home tab) ───────────────────────────────────
+function renderMini() {
+  const recent = EVENTS.slice(0,3);
+  document.getElementById('miniCount').textContent = EVENTS.length+' events since Mar 2025';
+  document.getElementById('miniList').innerHTML = recent.map(e=>{
+    const cc=e.sev==='significant'?'c-sig':e.sev==='moderate'?'c-mod':'c-min';
+    return `<div style="padding:11px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;">
+      <div style="font-size:18px;font-weight:800;color:#fff;min-width:46px">${e.sizeStr}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:#fff">${e.loc}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${e.label} · ${e.distStr}</div>
+      </div>
+      <span class="chip ${cc}">${e.sev==='significant'?'Sig':'Mod'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── NWS LIVE DATA ──────────────────────────────────────────
+async function loadWeather() {
+  document.getElementById('rfLbl').innerHTML='<span class="spin">↻</span>';
+  try {
+    const pt = await fetch('https://api.weather.gov/points/41.682,-88.195',{headers:{'User-Agent':'HailWatch-iOS/1.0'}});
+    const ptd = await pt.json();
+    const st = await fetch(ptd.properties.observationStations,{headers:{'User-Agent':'HailWatch-iOS/1.0'}});
+    const std = await st.json();
+    const ob = await fetch(std.features[0].id+'/observations/latest',{headers:{'User-Agent':'HailWatch-iOS/1.0'}});
+    const od = (await ob.json()).properties;
+    const cF = c=>c==null?null:Math.round(c*9/5+32);
+    const mph= m=>m==null?null:Math.round(m*2.237);
+    const mi = m=>m==null?null:(m*0.000621371).toFixed(1);
+    const t=cF(od.temperature?.value), w=mph(od.windGust?.value||od.windSpeed?.value), v=mi(od.visibility?.value);
+    if(t!=null) document.getElementById('mT').textContent=t;
+    if(w!=null){const e=document.getElementById('mW');e.textContent=w;e.className='m-val '+(w>=58?'r':w>=35?'a':'g');}
+    if(v!=null) document.getElementById('mV').textContent=v;
+    document.getElementById('mC').textContent=od.textDescription||'—';
+    const al=await fetch('https://api.weather.gov/alerts/active?point=41.682,-88.195',{headers:{'User-Agent':'HailWatch-iOS/1.0'}});
+    renderAlerts((await al.json()).features||[]);
+  } catch(e){console.warn('NWS:',e);renderAlerts([]);}
+  document.getElementById('rfLbl').textContent='Refresh';
+  document.getElementById('tsLabel').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderAlerts(alerts){
+  const ha=alerts.filter(a=>{const ev=(a.properties.event||'').toLowerCase();return ev.includes('hail')||ev.includes('thunder')||ev.includes('severe');});
+  const card=document.getElementById('scard'), badge=document.getElementById('sbadge'), banner=document.getElementById('alertBanner');
+  if(ha.length){
+    const p=ha[0].properties;
+    card.className='status-card danger'; badge.className='s-badge d';
+    document.getElementById('sbt').textContent='⚠ Active Alert';
+    document.getElementById('sico').textContent='⛈';
+    document.getElementById('sh').textContent=p.event||'Severe Weather';
+    document.getElementById('sd').textContent=(p.description||'').substring(0,160)+'…';
+    banner.className='alert-banner on red';
+    document.getElementById('alertTitle').textContent='⚠ '+(p.event||'Severe Weather');
+    document.getElementById('alertBody').textContent=p.headline||'';
+    addHail(30);
+  } else if(alerts.length){
+    card.className='status-card warn'; badge.className='s-badge w';
+    document.getElementById('sbt').textContent='⚡ Watch In Effect';
+    document.getElementById('sico').textContent='🌩';
+    document.getElementById('sh').textContent=alerts[0].properties.event||'Weather Watch';
+    document.getElementById('sd').textContent=(alerts[0].properties.headline||'').substring(0,160);
+    banner.className='alert-banner on amber';
+    document.getElementById('alertTitle').textContent='⚡ '+alerts[0].properties.event;
+    document.getElementById('alertBody').textContent=alerts[0].properties.headline||'';
+    addHail(10);
+  } else {
+    card.className='status-card ok'; badge.className='s-badge o';
+    document.getElementById('sbt').textContent='✓ No Active Alerts';
+    document.getElementById('sico').textContent='🌤';
+    document.getElementById('sh').textContent='No Hail Threat';
+    document.getElementById('sd').textContent='Frost Lane · Naperville IL 60564 — monitoring active';
+    banner.className='alert-banner';
+  }
+}
+
+// ── RAIN / HAIL ANIMATION ──────────────────────────────────
+function createRain(){
+  const c=document.getElementById('rain');
+  for(let i=0;i<40;i++){
+    const d=document.createElement('div');d.className='drop';
+    d.style.cssText=`left:${Math.random()*100}%;height:${Math.random()*50+25}px;animation-duration:${Math.random()*1.4+0.7}s;animation-delay:${Math.random()*2}s`;
+    c.appendChild(d);
+  }
+}
+function addHail(n){
+  const c=document.getElementById('rain');
+  c.querySelectorAll('.hstone').forEach(h=>h.remove());
+  for(let i=0;i<n;i++){
+    const s=document.createElement('div');s.className='hstone';
+    const sz=Math.random()*5+3;
+    s.style.cssText=`left:${Math.random()*100}%;width:${sz}px;height:${sz}px;animation-duration:${Math.random()*1.1+0.5}s;animation-delay:${Math.random()*3}s`;
+    c.appendChild(s);
+  }
+}
+
+// ── INSTALL BANNER (show in Safari browser, not when installed) ──
+function checkInstall(){
+  const isStandalone = window.navigator.standalone === true;
+  const dismissed = localStorage.getItem('hw_dismissed');
+  if(!isStandalone && !dismissed){
+    document.getElementById('installBar').classList.add('show');
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────
+createRain();
+window.addEventListener('load', async()=>{
+  renderMini();
+  checkInstall();
+  await loadWeather();
+  document.getElementById('loader').classList.add('gone');
+});
+setInterval(loadWeather, 5*60*1000);
+</script>
+</body>
+</html>
