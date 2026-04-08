@@ -39,9 +39,9 @@
   .shell {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
-    min-height: 100svh;
-    min-height: 100dvh;
+    height: 100vh;
+    height: 100svh;
+    height: 100dvh;
     max-width: 430px;
     margin: 0 auto;
     position: relative;
@@ -137,12 +137,13 @@
   /* ── SCROLL BODY ── */
   .body {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     position: relative;
     z-index: 5;
-    padding: 14px 14px calc(95px + var(--safe-bot));
+    padding: 14px 14px 24px;
     scroll-behavior: smooth;
   }
 
@@ -405,9 +406,9 @@
 
   /* ── BOTTOM NAV ── */
   .tab-bar {
-    position: sticky;
-    bottom: 0;
+    position: relative;
     z-index: 20;
+    flex-shrink: 0;
     display: flex;
     background: rgba(10,22,40,0.95);
     backdrop-filter: blur(24px);
