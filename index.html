@@ -405,19 +405,23 @@
     position: relative;
     z-index: 10;
     display: flex;
+    align-items: stretch;
     background: rgba(10,22,40,0.85);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border-top: 0.5px solid var(--border);
-    padding-bottom: var(--safe-bot);
+    padding-bottom: env(safe-area-inset-bottom);
+    min-height: calc(64px + env(safe-area-inset-bottom));
   }
   .tab {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
-    padding: 10px 4px 6px;
+    justify-content: center;
+    gap: 4px;
+    min-height: 64px;
+    padding: 8px 4px;
     cursor: pointer;
     color: var(--muted);
     transition: color .2s;
@@ -429,7 +433,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   .tab.active { color: var(--alert); }
-  .tab-ico { font-size: 22px; line-height: 1; }
+  .tab-ico { font-size: 20px; line-height: 1; }
 
   /* ── PAGES ── */
   .page { display: none; }
